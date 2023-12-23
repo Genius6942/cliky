@@ -1,0 +1,1 @@
+export const $ = <T extends HTMLElement>(query: string) => document.querySelector(query) as T;

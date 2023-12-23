@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + TS</title>
+    <script src="https://cdn.tailwindcss.com/"></script>
+  </head>
+  <body>
+    <div
+      id="screen-connecting"
+      class="flex items-center justify-center h-screen text-3xl"
+    >
+      Connecting...
+    </div>
+    <div
+      id="screen-lobby"
+      class="flex items-center justify-center h-screen flex-col gap-20"
+      style="display: none"
+    >
+      <div class="text-4xl text-center">
+        Room code:
+        <div id="roomID"></div>
+      </div>
+      <div class="flex items-center justify-center gap-10">
+        <div class="flex items-center justify-center gap-5">
+          <div class="flex items-center justify-center gap-5">
+            <div class="flex items-center gap-5">
+              <div class="flex flex-col items-center justify-center gap-5">
+                <div class="text-2xl flex gap-3 items-end">
+                  <div id="player-count" class="text-4xl"></div>
+                  Players
+                </div>
+                <div id="players" class="flex w-96 flex-wrap gap-3"></div>
+              </div>
+              <div class="h-72 w-1 bg-black"></div>
+              <div class="flex flex-col items-center justify-center gap-5">
+                <button class="border-2 border-black p-2 rounded-md" id="button-start" style="display: none;">
+                  Start game
+                </button>
+                <button class="border-2 border-black p-2 rounded-md" id="button-leave">
+                  Leave room
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      id="screen-first"
+      class="flex items-center justify-center gap-10 h-screen"
+      style="display: none"
+    >
+      <div class="flex flex-col items-center justify-center gap-5">
+        <input
+          class="border-2 border-black p-2 rounded-md"
+          placeholder="Enter room code"
+          id="input-join"
+        />
+
+        <button class="border-2 border-black p-2 rounded-md" id="button-join">
+          Join room
+        </button>
+      </div>
+      <div class="h-72 w-1 bg-black"></div>
+      <div class="flex flex-col items-center justify-center gap-5">
+        <button class="border-2 border-black p-2 rounded-md" id="button-create">
+          Create room
+        </button>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

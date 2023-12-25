@@ -1,7 +1,17 @@
 import { Server } from "socket.io";
+import express from "express";
 import { createRoom, joinRoom, removePlayer } from "./roomHandler";
 
-const io = new Server(3000, {
+const app = express();
+if (process.env.NODE_ENV !== "development") {
+  app.use(express.static("../client/"));
+}
+
+const port = process.env.PORT || 3000;
+
+const server = app.listen(port, () => console.log(`listening on port ${port}`));
+
+const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],

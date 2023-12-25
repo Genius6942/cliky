@@ -1,9 +1,9 @@
 import { io } from "socket.io-client";
 import { switchScreen } from "./screens";
 import { $ } from "./dom";
-import { click } from "./render";
+import { click, incrementPlayer, setPlayers } from "./render";
 
-const socket = io("http://localhost:3000");
+const socket = io(import.meta.env.DEV ? "http://localhost:3000" : location.href);
 
 socket.on("connect", () => {
   console.log("connected");
@@ -23,13 +23,12 @@ socket.on("connect", () => {
 socket.on("err", (err: string) => {
   alert(err);
 });
-let host = false;
+// let host = false;
 
 let numPlayers = 0;
+let players: string[] = [];
 
 socket.on("room.host", () => {
-  host = true;
-
   $("#button-start").style.display = "";
 });
 
@@ -51,7 +50,8 @@ socket.on("room.join", ({ id }: { id: string }) => {
   });
 });
 
-socket.on("room.update", ({ players }: { players: string[] }) => {
+socket.on("room.update", ({ players: newPlayers }: { players: string[] }) => {
+  players = newPlayers;
   $("#players").innerHTML = "";
   for (const color of players) {
     const div = document.createElement("div");
@@ -61,9 +61,11 @@ socket.on("room.update", ({ players }: { players: string[] }) => {
   }
   $("#player-count").innerText = players.length.toString();
   numPlayers = players.length;
+  setPlayers(players);
 });
 
 socket.on("game.start", () => {
+  setPlayers(players);
   switchScreen("game");
   const listener = (e: MouseEvent) => {
     socket.emit("game.click", { x: e.clientX, y: e.clientY });
@@ -87,17 +89,28 @@ socket.on("game.start", () => {
       winnerID: string;
     }) => {
       document.removeEventListener("click", listener);
-      click({ x, y, color: winner, time: 0 });
+      click({
+        x,
+        y,
+        color: winner,
+        time: 0,
+        overrideConfig: {
+          finalRadius: Math.max(window.innerWidth, window.innerHeight) * 2,
+          fadeTime: 180,
+        },
+      });
       if (winnerID === socket.id) {
-        alert("You won!");
+        // alert("You won!");
       } else {
         alert("You lost!");
       }
     }
   );
 });
+
 socket.on("game.click", ({ x, y, color }: { x: number; y: number; color: string }) => {
   click({ x, y, color, time: 0 });
+  incrementPlayer(color);
 });
 
-socket.on("game.end", () => switchScreen("lobby"));
+socket.on("game.end", () => setTimeout(() => switchScreen("lobby"), 3000));

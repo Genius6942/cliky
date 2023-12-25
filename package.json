@@ -8,9 +8,9 @@
     "bun": "bun run --watch ./server/index.ts",
     "build-client": "tsc && vite build",
     "build-server": "tsc --downlevelIteration --esModuleInterop --outDir build/server ./server/index.ts",
-    "build": "npm run build-client && npm run build-server",
+    "build": "npm run build-client && npm run build-server && node ./fixPackage.mjs",
     "preview": "vite preview",
-		"start": "node ./build/server/index.js"
+    "start": "node ./build/server/index.js"
   },
   "devDependencies": {
     "typescript": "^5.2.2",

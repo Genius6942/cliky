@@ -2,7 +2,6 @@
   "name": "cliky",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "bun": "bun run --watch ./server/index.ts",

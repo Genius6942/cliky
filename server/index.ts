@@ -1,12 +1,14 @@
 import { Server } from "socket.io";
 import express from "express";
 import { createRoom, joinRoom, removePlayer } from "./roomHandler";
+import { join as joinPath } from "path";
 
 const app = express();
-if (process.env.NODE_ENV !== "development") {
-  app.use(express.static("../client/"));
-}
+// if (process.env.NODE_ENV !== "development") {
+app.use(express.static(joinPath(process.cwd(), "build/client")));
+// }
 
+app.get("/status", (_, res) => res.status(200).send("200 ok"));
 const port = process.env.PORT || 3000;
 
 const server = app.listen(port, () => console.log(`listening on port ${port}`));

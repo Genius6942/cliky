@@ -17,14 +17,17 @@ const socket = io(import.meta.env.DEV ? "http://localhost:3000" : location.href,
 
 socket.on("disconnect", (reason) => {
   console.log("disconnected", reason);
-	alert("Disconnected from server: " + reason);
-	history.go(0);
+  $("#disconnectedReason").innerText = reason;
+  switchScreen("disconnected");
 });
 ["join", "name"].forEach((name) => bindEnter(name));
 
 socket.on("connect", () => {
   console.log("connected");
   switchScreen("name");
+});
+socket.on("ban", (reason: string) => {
+  alert(`You have been banned: ${reason}`);
 });
 
 $("#button-name").addEventListener("click", () => {
@@ -78,7 +81,6 @@ socket.on("room.join", ({ id }: { id: string }) => {
       alert("You need at least 2 players to start the game");
     } else {
       socket.emit("room.start");
-      console.log("starting??");
     }
   });
 });
@@ -109,12 +111,12 @@ socket.on("room.update", ({ players: newPlayers }: { players: Player[] }) => {
   }
   $("#player-count").innerText = players.length.toString();
   numPlayers = players.length;
-  console.log("update players", players, numPlayers);
   setPlayers(players);
 });
 
 socket.on("game.start", () => {
   setPlayers(players);
+	lockPlayers();
   switchScreen("game");
   updateCountdown({ count: 3 });
   const listener = (e: MouseEvent) => {
@@ -152,7 +154,6 @@ socket.on(
 );
 
 socket.on("game.end", ({ winnerID }: { winnerID: string }) => {
-  lockPlayers();
   setTimeout(() => {
     const endScreen = $("#endScreen");
     endScreen.className = "endScreen";

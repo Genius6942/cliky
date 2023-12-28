@@ -21,7 +21,6 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-  // console.log("a user connected at id", socket.id);
   let name: string;
 
   const checkName = () => {
@@ -34,7 +33,11 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     removePlayer(socket.id);
-    // console.log("user disconnected at id", socket.id);
+  });
+
+  socket.on("ping", (id?: string) => {
+    if (id) socket.emit("pong", id);
+    else socket.emit("pong");
   });
 
   socket.on("name", (newName: string) => {
@@ -42,12 +45,12 @@ io.on("connection", (socket) => {
   });
 
   socket.on("room.create", () => {
-		if (checkName()) return;
+    if (checkName()) return;
     createRoom(io, socket, name);
   });
 
   socket.on("room.join", (roomID: string) => {
-		if (checkName()) return;
+    if (checkName()) return;
     joinRoom(socket, roomID, name);
   });
 

@@ -11,8 +11,13 @@ export class Room {
     socket: Socket;
     color: string;
     host: boolean;
+    name: string;
+    score: number;
+    clicks: number;
   }[];
   id: string;
+
+  ingame = false;
 
   settings: GameSettings;
 
@@ -32,16 +37,33 @@ export class Room {
   }
 
   emitPlayers() {
-    this.io
-      .to(this.id)
-      .emit("room.update", { players: this.players.map(({ color }) => color) });
+    this.io.to(this.id).emit("room.update", {
+      players: this.players.map(({ clicks, color, host, name, score, socket }) => ({
+        clicks,
+        color,
+        host,
+        name,
+        score,
+        id: socket.id,
+      })),
+    });
   }
 
-  addPlayer({ socket, host }: { socket: Socket; host?: boolean }) {
+  addPlayer({ socket, host, name }: { socket: Socket; host?: boolean; name: string }) {
+    if (this.players.map((player) => player.socket.id).includes(socket.id))
+      throw new Error("You are already in this room");
+
     this.players.push({
       socket,
-      color: "#" + Math.floor(Math.random() * 16777215).toString(16),
+      color:
+        "#" +
+        Math.floor(Math.random() * 0xffffff)
+          .toString(16)
+          .padStart(6, "0"),
       host: !!host,
+      name,
+      score: 0,
+      clicks: 0,
     });
 
     socket.emit("room.join", { id: this.id });
@@ -72,6 +94,8 @@ export class Room {
   }
 
   startGame() {
+    if (this.ingame) return this.host.socket.emit("err", "Game already in progress");
+    this.ingame = true;
     this.io.to(this.id).emit("game.start");
 
     const players = this.players.map((p) => ({ ...p, clicks: 0 }));
@@ -83,15 +107,19 @@ export class Room {
         socket.on("game.click", ({ x, y }: { x: number; y: number }) => {
           if (gameOver) return;
           player.clicks++;
+          this.players.find((player) => player.socket.id === socket.id)!.clicks++;
 
-          this.io.to(this.id).emit("game.click", { x, y, color: player.color });
+          this.io.to(this.id).emit("game.click", { x, y, color: player.color, id: socket.id });
 
           if (this.settings.mode === "clicks") {
             if (player.clicks >= this.settings.target) {
               this.io
                 .to(this.id)
                 .emit("game.end", { winner: player.color, x, y, winnerID: socket.id });
+              this.players.find((player) => player.socket.id === socket.id)!.score++;
+              this.emitPlayers();
               gameOver = true;
+              this.ingame = false;
             }
           }
         });
@@ -109,6 +137,10 @@ export class Room {
         this.io
           .to(this.id)
           .emit("game.end", { winner: winner.color, winnerID: winner.socket.id });
+        this.players.find((player) => player.socket.id === winner.socket.id)!.score++;
+        this.emitPlayers();
+        gameOver = true;
+        this.ingame = false;
       }, this.settings.target + 3000);
     }
   }

@@ -1,3 +1,5 @@
+import { Player } from "./main";
+
 const canvas = document.createElement("canvas");
 const ctx = canvas.getContext("2d")!;
 
@@ -29,24 +31,66 @@ export interface ClickFrame {
   overrideConfig?: Partial<ClickConfig>;
 }
 
-const players: { [k: string]: number } = {};
+const playersQueue: { [k: string]: { score: number; color: string } } = {};
+const players: { [k: string]: { score: number; color: string } } = {};
+let playersLocked = false;
 
-export const setPlayers = (newPlayers: string[]) => {
-  // wipe players
-  for (let player in players) {
+const updatePlayers = () => {
+  for (const player in players) {
     delete players[player];
   }
-
-  for (const player of newPlayers) {
-    players[player] = 0;
+  for (const player in playersQueue) {
+    players[player] = JSON.parse(JSON.stringify(playersQueue[player]));
   }
 };
 
-export const incrementPlayer = (color: string) => {
-  if (players[color] === undefined) {
-    players[color] = 0;
+export const lockPlayers = () => {
+  playersLocked = true;
+};
+
+export const unlockPlayers = () => {
+  playersLocked = false;
+  updatePlayers();
+};
+
+export const setPlayers = (newPlayers: Player[]) => {
+  // wipe players
+  for (let player in playersQueue) {
+    delete playersQueue[player];
   }
-  players[color]++;
+
+  for (const player of newPlayers) {
+    playersQueue[player.id] = { score: 0, color: player.color };
+  }
+
+  if (!playersLocked) {
+    updatePlayers();
+  }
+};
+
+export const incrementPlayer = (id: string) => {
+  if (players[id] === undefined) {
+    players[id] = { score: 0, color: "black" };
+  }
+  players[id].score++;
+};
+
+const countdown = {
+  count: 3,
+  timeGap: 1000,
+  fullSize: 300,
+  startMS: performance.now(),
+};
+
+export const updateCountdown = ({
+  count = countdown.count,
+  timeGap = countdown.timeGap,
+  fullSize = countdown.fullSize,
+}: Partial<typeof countdown>) => {
+  countdown.count = count;
+  countdown.timeGap = timeGap;
+  countdown.fullSize = fullSize;
+  countdown.startMS = performance.now();
 };
 
 const clickFrames: ClickFrame[] = [];
@@ -77,7 +121,7 @@ const drawPlayers = () => {
     const player = players[key];
     ctx.beginPath();
     ctx.arc(currentX, playerTopMargin + playerRadius, playerRadius, 0, Math.PI * 2);
-    ctx.fillStyle = key;
+    ctx.fillStyle = player.color;
     ctx.fill();
 
     ctx.fillStyle = "#000000";
@@ -85,13 +129,30 @@ const drawPlayers = () => {
     ctx.textBaseline = "top";
     ctx.font = "20px Arial";
     ctx.fillText(
-      player.toString(),
+      player.score.toString(),
       currentX,
       playerTopMargin + playerRadius * 2 + textMargin
     );
 
     currentX += playerGap + playerRadius * 2;
   }
+};
+
+const tickCountdown = () =>
+  countdown.count -
+  Math.floor((performance.now() - countdown.startMS) / countdown.timeGap);
+
+const drawCountdown = () => {
+  if (countdown.count < 0) return;
+  const text = tickCountdown() % countdown.timeGap || "GO";
+  if (typeof text === "number" && text < 0) return;
+  const progression =
+    ((performance.now() - countdown.startMS) % countdown.timeGap) / countdown.timeGap;
+  ctx.fillStyle = `rgba(0, 0, 0, ${1 - progression})`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `${progression * countdown.fullSize}px Arial`;
+  ctx.fillText(text.toString(), canvas.width / 2, canvas.height / 2);
 };
 
 const loop = () => {
@@ -112,7 +173,7 @@ const loop = () => {
     const config = { ...defaultConfig, ...overrideConfig };
 
     const alpha = (config.fadeTime - time) / config.fadeTime;
-    if (alpha === 0) continue;
+    if (alpha <= 0) continue;
     const rgb = hexToRgb(color);
     if (!rgb) continue;
     const radius = (time / config.fadeTime) * config.finalRadius;
@@ -125,6 +186,8 @@ const loop = () => {
   }
 
   drawPlayers();
+
+  drawCountdown();
 
   requestAnimationFrame(loop);
 };

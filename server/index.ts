@@ -22,18 +22,33 @@ const io = new Server(server, {
 
 io.on("connection", (socket) => {
   // console.log("a user connected at id", socket.id);
+  let name: string;
+
+  const checkName = () => {
+    if (!name || name === "") {
+      socket.emit("err", "Please set a name");
+      return true;
+    }
+    return false;
+  };
 
   socket.on("disconnect", () => {
     removePlayer(socket.id);
     // console.log("user disconnected at id", socket.id);
   });
 
+  socket.on("name", (newName: string) => {
+    name = newName;
+  });
+
   socket.on("room.create", () => {
-    createRoom(io, socket);
+		if (checkName()) return;
+    createRoom(io, socket, name);
   });
 
   socket.on("room.join", (roomID: string) => {
-    joinRoom(socket, roomID);
+		if (checkName()) return;
+    joinRoom(socket, roomID, name);
   });
 
   socket.on("room.leave", () => {

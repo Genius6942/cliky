@@ -5,10 +5,14 @@ const rooms = new Map<string, Room>();
 
 export const getRoom = (id: string) => rooms.get(id);
 
-export const joinRoom = (socket: Socket, roomID: string) => {
+export const joinRoom = (socket: Socket, roomID: string, name: string) => {
   const room = rooms.get(roomID);
   if (!room) return socket.emit("err", "Room not found");
-  room.addPlayer({ socket });
+  try {
+		room.addPlayer({ socket, name });
+	} catch (e) {
+		socket.emit("err", e);
+	}
 };
 export const generateRoomID = () => {
   const length = 4;
@@ -20,11 +24,11 @@ export const generateRoomID = () => {
   return result;
 };
 
-export const createRoom = (io: Server, socket: Socket) => {
+export const createRoom = (io: Server, socket: Socket, name: string) => {
   const id = generateRoomID();
   const room = new Room(io, id);
   rooms.set(id, room);
-  room.addPlayer({ socket, host: true });
+  room.addPlayer({ socket, host: true, name });
   return id;
 };
 

@@ -1,4 +1,5 @@
 import { Boost, getValue } from "../../server/room";
+import { $ } from "./dom";
 import { Player } from "./main";
 
 const canvas = document.createElement("canvas");
@@ -249,7 +250,19 @@ const drawBoost = () => {
   }
 };
 
+const frames: number[] = [];
+let lastFrame = performance.now();
+
 const loop = () => {
+	const now = performance.now();
+	frames.push(now - lastFrame);
+	lastFrame = now;
+	if (frames.length > 10) {
+		const avg = frames.reduce((a, b) => a + b) / frames.length;
+		frames.splice(0, frames.length - 10);
+		$("#fps").innerText = Math.round(1000 / avg).toString();
+	}
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (let i = clickFrames.length - 1; i >= 0; i--) {

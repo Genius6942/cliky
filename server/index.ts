@@ -2,11 +2,10 @@ import { Server } from "socket.io";
 import express from "express";
 import { createRoom, joinRoom, removePlayer } from "./roomHandler";
 import { join as joinPath } from "path";
+import { config } from "./config";
 
 const app = express();
-// if (process.env.NODE_ENV !== "development") {
 app.use(express.static(joinPath(process.cwd(), "build/client")));
-// }
 
 app.get("/status", (_, res) => res.status(200).send("200 ok"));
 const port = process.env.PORT || 3000;
@@ -21,6 +20,8 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
+	socket.emit("version", config.version)
+
   let name: string;
 
   const checkName = () => {

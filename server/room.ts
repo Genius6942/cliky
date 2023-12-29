@@ -1,8 +1,31 @@
 import { Server, Socket } from "socket.io";
 
+export type RangeOrValue = number | { min: number; max: number };
+
+export const getValue = (value: RangeOrValue) => {
+  if (typeof value === "number") return value;
+  return Math.floor(Math.random() * (value.max - value.min + 1)) + value.min;
+};
+
+export interface Boost {
+  points: number;
+  x: number;
+  y: number;
+  radius: number;
+  edges: number;
+}
+
 export interface GameSettings {
   mode: "clicks" | "time";
   target: number;
+  boosts:
+    | false
+    | {
+        points: RangeOrValue;
+        cooldown: RangeOrValue;
+        radius: RangeOrValue;
+        edges: RangeOrValue;
+      };
 }
 
 export class Room {
@@ -14,6 +37,10 @@ export class Room {
     name: string;
     score: number;
     clicks: number;
+    screen: {
+      width: number;
+      height: number;
+    };
   }[];
   id: string;
 
@@ -29,6 +56,24 @@ export class Room {
     this.settings = {
       mode: "clicks",
       target: 100,
+      boosts: {
+        points: {
+          min: 10,
+          max: 20,
+        },
+        cooldown: {
+          min: 750,
+          max: 1250,
+        },
+        radius: {
+          min: 40,
+          max: 70,
+        },
+        edges: {
+          min: 3,
+          max: 8,
+        },
+      },
     };
   }
 
@@ -64,6 +109,10 @@ export class Room {
       name,
       score: 0,
       clicks: 0,
+      screen: {
+        width: 100,
+        height: 100,
+      },
     });
 
     socket.emit("room.join", { id: this.id });
@@ -77,6 +126,13 @@ export class Room {
       if (socket.id === this.host.socket.id) {
         this.startGame();
       }
+    });
+
+    socket.on("screen", ({ width, height }: { width: number; height: number }) => {
+      this.players.find((player) => player.socket.id === socket.id)!.screen = {
+        width,
+        height,
+      };
     });
   }
 
@@ -101,11 +157,32 @@ export class Room {
     const players = this.players.map((p) => ({
       ...p,
       clicks: [] as number[],
+      extraClicks: 0,
       susLevel: 0,
     }));
     let gameOver = false; // hi
 
     setTimeout(() => {
+      let boost: Boost | null = null;
+
+      const generateBoost = async () => {
+        if (!this.settings.boosts) return;
+        await new Promise((resolve) =>
+          // @ts-ignore
+          setTimeout(resolve, getValue(this.settings.boosts.cooldown))
+        );
+        boost = {
+          points: getValue(this.settings.boosts.points),
+          x: Math.random(),
+          y: Math.random(),
+          radius: getValue(this.settings.boosts.radius),
+          edges: getValue(this.settings.boosts.edges),
+        };
+        this.io.to(this.id).emit("game.boost.add", boost);
+      };
+
+      generateBoost();
+
       players.forEach((player) => {
         const socket = player.socket;
         socket.on("game.click", ({ x, y }: { x: number; y: number }) => {
@@ -121,8 +198,7 @@ export class Room {
           // if variance < 0.5
           let alreadyFlagged = false;
           if (player.clicks.length > 3) {
-            const cps =
-              player.clicks.length / ((now - player.clicks[0]) / 1000);
+            const cps = player.clicks.length / ((now - player.clicks[0]) / 1000);
             if (cps > 25) {
               player.susLevel++;
               alreadyFlagged = true;
@@ -148,25 +224,38 @@ export class Room {
 
             variance /= Math.min(player.clicks.length, 30) - 1;
             variance /= 1000;
-            console.log(variance);
             if (variance < 0.1) {
               if (!alreadyFlagged) player.susLevel++;
-              console.log(`variance is ${variance}!`);
             }
           }
-          if (player.susLevel > 10) {
-            console.log(`stop being a bad person :'(`);
-            console.log("you hurt my feelwings 🥺");
-            socket.emit("ban", "Kicked by anticheat. Infractions: " + player.susLevel);
+          if (player.susLevel >= 10) {
+            socket.emit("ban", "Kicked by anticheat.");
             socket.disconnect();
           }
 
           this.io
             .to(this.id)
             .emit("game.click", { x, y, color: player.color, id: socket.id });
+          if (
+            boost &&
+            Math.sqrt(
+              Math.pow(x - boost.x * player.screen.width, 2) +
+                Math.pow(y - boost.y * player.screen.height, 2)
+            ) <= boost.radius
+          ) {
+            this.io
+              .to(this.id)
+              .emit("game.boost.click", { color: player.color, id: socket.id });
+            player.extraClicks += boost.points;
+            this.players.find((player) => player.socket.id === socket.id)!.clicks +=
+              boost.points;
+
+            boost = null;
+            generateBoost();
+          }
 
           if (this.settings.mode === "clicks") {
-            if (player.clicks.length >= this.settings.target) {
+            if (player.clicks.length + player.extraClicks >= this.settings.target) {
               this.io
                 .to(this.id)
                 .emit("game.end", { winner: player.color, x, y, winnerID: socket.id });

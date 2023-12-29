@@ -3,12 +3,15 @@ import { switchScreen } from "./screens";
 import { $, bindEnter } from "./dom";
 import {
   click,
+  explodeBoost,
   incrementPlayer,
   lockPlayers,
+  setBoost,
   setPlayers,
   unlockPlayers,
   updateCountdown,
 } from "./render";
+import { toast } from "./toast";
 
 const socket = io(import.meta.env.DEV ? "http://localhost:3000" : location.href, {
   transports: ["websocket"],
@@ -17,7 +20,31 @@ const socket = io(import.meta.env.DEV ? "http://localhost:3000" : location.href,
 
 socket.on("disconnect", (reason) => {
   console.log("disconnected", reason);
-  $("#disconnectedReason").innerText = reason;
+  let reasonText = "";
+  switch (reason) {
+    case "io server disconnect":
+      reasonText = "Disconnected by server";
+      break;
+    case "io client disconnect":
+      reasonText = "Disconnected by client";
+      break;
+    case "transport close":
+      reasonText = "Connection error";
+      break;
+    case "ping timeout":
+      reasonText = "Connection timed out";
+      break;
+    case "transport error":
+      reasonText = "Connection error";
+      break;
+    case "parse error":
+      reasonText = "Connection error";
+      break;
+    default:
+      reasonText = "Connection error";
+      break;
+  }
+  $("#disconnectedReason").innerText = reasonText;
   switchScreen("disconnected");
 });
 ["join", "name"].forEach((name) => bindEnter(name));
@@ -27,7 +54,7 @@ socket.on("connect", () => {
   switchScreen("name");
 });
 socket.on("ban", (reason: string) => {
-  alert(`You have been banned: ${reason}`);
+  toast({ text: "You have been banned: " + reason, level: "error" });
 });
 
 $("#button-name").addEventListener("click", () => {
@@ -49,7 +76,7 @@ $("#button-name").addEventListener("click", () => {
 });
 
 socket.on("err", (err: string) => {
-  alert(err);
+  toast({ text: err, level: "error" });
 });
 // let host = false;
 
@@ -71,6 +98,10 @@ socket.on("room.host", () => {
 socket.on("room.join", ({ id }: { id: string }) => {
   switchScreen("lobby");
   $("#roomID").innerText = id;
+  $("#roomID").addEventListener("click", () => {
+    navigator.clipboard.writeText(id);
+    toast({ text: "Copied room code to clipboard", level: "info" });
+  });
 
   $("#button-leave").addEventListener("click", () => {
     history.go(0);
@@ -83,7 +114,14 @@ socket.on("room.join", ({ id }: { id: string }) => {
       socket.emit("room.start");
     }
   });
+
+  updateScreen();
+  window.addEventListener("resize", updateScreen);
 });
+
+const updateScreen = () => {
+  socket.emit("screen", { width: window.innerWidth, height: window.innerHeight });
+};
 
 socket.on("room.update", ({ players: newPlayers }: { players: Player[] }) => {
   players = newPlayers;
@@ -116,7 +154,7 @@ socket.on("room.update", ({ players: newPlayers }: { players: Player[] }) => {
 
 socket.on("game.start", () => {
   setPlayers(players);
-	lockPlayers();
+  lockPlayers();
   switchScreen("game");
   updateCountdown({ count: 3 });
   const listener = (e: MouseEvent) => {
@@ -152,6 +190,35 @@ socket.on(
     incrementPlayer(id);
   }
 );
+
+socket.on(
+  "game.boost.add",
+  ({
+    points,
+    x,
+    y,
+    radius,
+    edges,
+  }: {
+    points: number;
+    x: number;
+    y: number;
+    radius: number;
+    edges: number;
+  }) => {
+    setBoost({
+      points,
+      x: window.innerWidth * x,
+      y: window.innerHeight * y,
+      radius: radius,
+      edges,
+    });
+  }
+);
+
+socket.on("game.boost.click", ({ color, id }: { color: string; id: string }) => {
+  explodeBoost(color, id);
+});
 
 socket.on("game.end", ({ winnerID }: { winnerID: string }) => {
   setTimeout(() => {

@@ -1,3 +1,4 @@
+import { Boost, getValue } from "../../server/room";
 import { Player } from "./main";
 
 const canvas = document.createElement("canvas");
@@ -93,6 +94,44 @@ export const updateCountdown = ({
   countdown.startMS = performance.now();
 };
 
+let boost: (Boost & { rotation: number }) | null = null;
+let boostParticles: {
+  x: number;
+  y: number;
+  radius: number;
+  color: { r: number; g: number; b: number };
+  time: number;
+  velocity: { x: number; y: number };
+}[] = [];
+const boostVelocity = {
+  min: 1,
+  max: 20,
+};
+const boostFadeTime = 30;
+export const setBoost = (newBoost: Boost) => {
+  boost = { ...newBoost, rotation: 0 };
+};
+
+export const explodeBoost = (color: string, id: string) => {
+  if (!boost) return;
+	players[id].score += boost.points;
+  boostParticles = [];
+  for (let i = 0; i < 100; i++) {
+		boostParticles.push({
+			x: boost.x,
+      y: boost.y,
+      radius: Math.random() * 10,
+      color: hexToRgb(color) as any,
+      time: boostFadeTime,
+      velocity: {
+				x: (Math.random() > 0.5 ? -1 : 1) * getValue(boostVelocity),
+        y: (Math.random() > 0.5 ? -1 : 1) * getValue(boostVelocity),
+      },
+    });
+  }
+	boost = null;
+};
+
 const clickFrames: ClickFrame[] = [];
 
 const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
@@ -155,6 +194,61 @@ const drawCountdown = () => {
   ctx.fillText(text.toString(), canvas.width / 2, canvas.height / 2);
 };
 
+const updateBoostParticles = () => {
+  for (let i = boostParticles.length - 1; i >= 0; i--) {
+    const particle = boostParticles[i];
+    particle.time--;
+    if (particle.time <= 0) {
+      boostParticles.splice(i, 1);
+      continue;
+    }
+    particle.x += particle.velocity.x;
+    particle.y += particle.velocity.y;
+  }
+};
+
+const drawBoostParticles = () => {
+  for (const particle of boostParticles) {
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${particle.color.r}, ${particle.color.g}, ${
+      particle.color.b
+    }, ${particle.time / boostFadeTime})`;
+    ctx.fill();
+  }
+};
+const drawBoost = () => {
+  if (boost) {
+    ctx.save();
+    ctx.translate(boost.x, boost.y);
+    ctx.rotate(boost.rotation);
+    ctx.beginPath();
+    for (let i = 0; i < boost.edges; i++) {
+      let currAngle = (i * 2 * Math.PI) / boost.edges;
+      let x = boost.radius * Math.cos(currAngle);
+      let y = boost.radius * Math.sin(currAngle);
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.closePath();
+    const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, boost.radius * 5);
+    boost.rotation += Math.PI / 90;
+    gradient.addColorStop(0, `hsl(${(boost.rotation / (Math.PI * 2)) * 360}, 100%, 50%)`);
+    gradient.addColorStop(
+      1,
+      `hsl(${((boost.rotation + 30 / (Math.PI * 2)) / (Math.PI * 2)) * 360}, 100%, 0%)`
+    );
+
+    ctx.fillStyle = gradient;
+
+    ctx.fill();
+    ctx.restore();
+  }
+};
+
 const loop = () => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -184,6 +278,11 @@ const loop = () => {
     ctx.fillStyle = rgbString;
     ctx.fill();
   }
+
+  drawBoost();
+
+  updateBoostParticles();
+  drawBoostParticles();
 
   drawPlayers();
 

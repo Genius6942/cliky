@@ -52,22 +52,27 @@ socket.on("disconnect", (reason) => {
 socket.on("connect", () => {
   console.log("connected");
   switchScreen("name");
-	pingLoop();
+  pingLoop([]);
 });
 
 socket.on("version", (version: string) => {
-	$("#version").innerText = version;
-})
+  $("#version").innerText = version;
+});
 
-const pingLoop = () => {
-	const start = performance.now();
-	socket.emit("ping");
-	socket.once("pong", () => {
-		const latency = performance.now() - start;
-		$("#ping").innerText = latency.toFixed(0);
-		setTimeout(pingLoop, 100);
-	});
-}
+const pingsNeeded = 10;
+const pingLoop = (pings: number[]) => {
+  const start = performance.now();
+  socket.emit("ping");
+  socket.once("pong", () => {
+    const latency = performance.now() - start;
+    pings.push(latency);
+    if (pings.length >= pingsNeeded) {
+      $("#ping").innerText = (pings.reduce((a, b) => a + b) / pings.length).toFixed(0);
+      pings.splice(0, pings.length);
+    }
+    setTimeout(() => pingLoop(pings), 100);
+  });
+};
 
 socket.on("ban", (reason: string) => {
   toast({ text: "You have been banned: " + reason, level: "error" });

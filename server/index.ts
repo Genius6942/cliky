@@ -20,7 +20,7 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-	socket.emit("version", config.version)
+  socket.emit("version", config.version);
 
   let name: string;
 

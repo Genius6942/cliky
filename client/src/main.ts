@@ -358,10 +358,10 @@ settingsItems.forEach((item) => {
   });
 });
 
-$("#settings-boosts").addEventListener("change", () => {
+boostToggle.addEventListener("change", () => {
   socket.emit("room.settings", {
     key: "boosts",
-    value: $<HTMLInputElement>("#settings-boosts").checked
+    value: boostToggle.checked
       ? config.defaultSettings.boosts
       : false,
   });

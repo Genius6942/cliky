@@ -29,6 +29,11 @@ io.on("connection", (socket) => {
       socket.emit("err", "Please set a name");
       return true;
     }
+
+    if (name === "system" || name === "System") {
+      socket.emit("err", "Blacklisted name");
+      return true;
+    }
     return false;
   };
 
@@ -43,6 +48,8 @@ io.on("connection", (socket) => {
 
   socket.on("name", (newName: string) => {
     name = newName;
+    if (checkName()) name = undefined;
+    else socket.emit("ready");
   });
 
   socket.on("room.create", () => {

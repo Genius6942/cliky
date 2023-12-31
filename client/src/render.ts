@@ -238,10 +238,11 @@ const drawBoost = () => {
     const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, boost.radius * 5);
     boost.rotation += Math.PI / 90;
     gradient.addColorStop(0, `hsl(${(boost.rotation / (Math.PI * 2)) * 360}, 100%, 50%)`);
-    gradient.addColorStop(
-      1,
-      `hsl(${((boost.rotation + 30 / (Math.PI * 2)) / (Math.PI * 2)) * 360}, 100%, 0%)`
-    );
+    gradient.addColorStop(1, `hsl(${(boost.rotation / (Math.PI * 2)) * 360}, 100%, 50%)`);
+    // gradient.addColorStop(
+    //   1,
+    //   `hsl(${((boost.rotation + 30 / (Math.PI * 2)) / (Math.PI * 2)) * 360}, 100%, 0%)`
+    // );
 
     ctx.fillStyle = gradient;
 

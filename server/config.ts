@@ -5,10 +5,10 @@ export interface Config {
   version: string;
 }
 
-export const config: Config = {
-  version: "1.1.0",
+export const config = {
+  version: "2.0.0",
   defaultSettings: {
-    mode: "clicks",
+    mode: "clicks" as GameSettings["mode"],
     target: 100,
     boosts: {
       points: {

@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 import { switchScreen } from "./screens";
-import { $, bindEnter } from "./dom";
+import { $, $$, bindEnter } from "./dom";
 import {
   click,
   explodeBoost,
@@ -12,6 +12,11 @@ import {
   updateCountdown,
 } from "./render";
 import { toast } from "./toast";
+import Choices from "choices.js";
+import { GameSettings } from "../../server/room";
+import { config } from "../../server/config";
+
+const err = (message: string) => toast({ text: message, level: "error" });
 
 const socket = io(import.meta.env.DEV ? "http://localhost:3000" : location.href, {
   transports: ["websocket"],
@@ -47,7 +52,7 @@ socket.on("disconnect", (reason) => {
   $("#disconnectedReason").innerText = reasonText;
   switchScreen("disconnected");
 });
-["join", "name"].forEach((name) => bindEnter(name));
+["join", "name", "chat"].forEach((name) => bindEnter(name));
 
 socket.on("connect", () => {
   console.log("connected");
@@ -80,10 +85,13 @@ socket.on("ban", (reason: string) => {
 
 $("#button-name").addEventListener("click", () => {
   const value = $<HTMLInputElement>("#input-name").value;
-  if (!value || value === "") return alert("Please enter a valid name");
+  if (!value || value === "") return err("Please enter a valid name");
+  if (value.length > 20) return err("Please enter a name shorter than 20 characters");
+  if (value.length < 3) return err("Please enter a name longer than 3 characters");
+  if (/[^a-zA-Z0-9]/.test(value))
+    return err("Name may only include alphanumeric characters");
   socket.emit("name", value);
-
-  switchScreen("menu");
+  socket.once("ready", () => switchScreen("menu"));
   $("#button-create").addEventListener("click", () => {
     socket.emit("room.create");
   });
@@ -91,7 +99,7 @@ $("#button-name").addEventListener("click", () => {
   $("#button-join").addEventListener("click", () => {
     const code = $<HTMLInputElement>("#input-join").value.toUpperCase();
     if (!code || code.length !== 4)
-      return alert("Please enter a valid room code (4 characters)");
+      return err("Please enter a valid room code (4 characters)");
     socket.emit("room.join", code);
   });
 });
@@ -112,13 +120,15 @@ export interface Player {
 }
 let players: Player[] = [];
 
+let settings: GameSettings;
+
 socket.on("room.host", () => {
   $("#button-start").style.display = "";
 });
 
 socket.on("room.join", ({ id }: { id: string }) => {
   switchScreen("lobby");
-  $("#roomID").innerText = id;
+  $("#roomID").innerHTML = id + '<span class="text-2xl ml-1">📋</span>';
   $("#roomID").addEventListener("click", () => {
     navigator.clipboard.writeText(id);
     toast({ text: "Copied room code to clipboard", level: "info" });
@@ -130,7 +140,7 @@ socket.on("room.join", ({ id }: { id: string }) => {
 
   $("#button-start").addEventListener("click", () => {
     if (numPlayers < 2) {
-      alert("You need at least 2 players to start the game");
+      err("You need at least 2 players to start the game");
     } else {
       socket.emit("room.start");
     }
@@ -160,8 +170,8 @@ socket.on("room.update", ({ players: newPlayers }: { players: Player[] }) => {
     detailsWrapper.className = "flex flex-col";
     const nameElement = document.createElement("div");
     nameElement.className = "flex items-center gap-3";
-    nameElement.innerHTML =
-      name + (host ? '<div class="italic px-1 font-bold">HOST</div>' : "");
+    nameElement.innerText += name;
+    nameElement.innerHTML += host ? '<div class="italic px-1 font-bold">HOST</div>' : "";
     detailsWrapper.appendChild(nameElement);
     detailsWrapper.appendChild(stats);
     div.appendChild(detailsWrapper);
@@ -252,4 +262,107 @@ socket.on("game.end", ({ winnerID }: { winnerID: string }) => {
       endScreen.className = "hidden";
     }, 2010);
   }, 1000);
+});
+
+socket.on("room.chat", ({ name, message }: { name: string; message: string }) => {
+  const div = document.createElement("div");
+  const span = document.createElement("span");
+  span.innerText = name;
+  span.classList.add("font-bold");
+  div.appendChild(span);
+  const text = document.createElement("span");
+  text.innerText = ": " + message.toString();
+  div.appendChild(text);
+  $("#chat").appendChild(div);
+  $("#chat").scrollTop = $("#chat").scrollHeight;
+});
+
+$("#button-chat").addEventListener("click", () => {
+  const message = $<HTMLInputElement>("#input-chat").value;
+  if (!message || message === "") return;
+  socket.emit("room.chat", message);
+  $<HTMLInputElement>("#input-chat").value = "";
+});
+
+$$(".fancy-select").forEach((item) => {
+  new Choices(item, { searchEnabled: false });
+});
+
+const settingsItems = $$<HTMLInputElement>(".setting");
+
+const boostToggle = $<HTMLInputElement>("#settings-boosts");
+
+const generateDeepKeys = (obj: any) => {
+  const keys: string[] = [];
+  for (const key in obj) {
+    if (typeof obj[key] === "object" && obj[key] !== null && !Array.isArray(obj[key])) {
+      for (const subKey of generateDeepKeys(obj[key])) {
+        keys.push(key + "." + subKey);
+      }
+    } else {
+      keys.push(key);
+    }
+  }
+  return keys;
+};
+
+const getDeepKeyValue = (obj: any, key: string) => {
+  const keys = key.split(".");
+  let value = obj;
+  for (const key of keys) {
+    value = value[key];
+  }
+  return value;
+};
+
+const updateSettingsUI = () => {
+  if (!settings) return;
+  if (settings.boosts) {
+    $("#settings-boosts-container").style.display = "";
+    $<HTMLInputElement>("#settings-boosts").checked = true;
+  } else {
+    $("#settings-boosts-container").style.display = "none";
+    $<HTMLInputElement>("#settings-boosts").checked = false;
+  }
+
+  const keys = generateDeepKeys(settings);
+  for (const key of keys) {
+    const setting = getDeepKeyValue(settings, key);
+    if (key === "boosts") continue;
+    const input = $<HTMLInputElement>("#settings-" + key.replaceAll(".", "-"));
+    if (!input) return;
+    if (input.type === "checkbox") {
+      input.checked = setting;
+    } else {
+      input.value = setting;
+    }
+  }
+};
+
+socket.on("room.settings", (newSettings: GameSettings) => {
+  settings = newSettings;
+  updateSettingsUI();
+  toast({ text: "Room config updated", level: "info" });
+});
+
+settingsItems.forEach((item) => {
+  item.addEventListener("blur", () => {
+    const key = item.id.replace("settings-", "").replaceAll("-", ".");
+    if (item.type === "checkbox") {
+      socket.emit("room.settings", { key, value: item.checked });
+    } else if (item.type === "number") {
+      socket.emit("room.settings", { key, value: parseInt(item.value) });
+    } else {
+      socket.emit("room.settings", { key, value: item.value });
+    }
+  });
+});
+
+$("#settings-boosts").addEventListener("change", () => {
+  socket.emit("room.settings", {
+    key: "boosts",
+    value: $<HTMLInputElement>("#settings-boosts").checked
+      ? config.defaultSettings.boosts
+      : false,
+  });
 });

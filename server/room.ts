@@ -8,6 +8,8 @@ export const getValue = (value: RangeOrValue) => {
   return Math.floor(Math.random() * (value.max - value.min + 1)) + value.min;
 };
 
+const deepCopy = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
+
 export interface Boost {
   points: number;
   x: number;
@@ -54,11 +56,81 @@ export class Room {
     this.players = [];
     this.id = id;
 
-    this.settings = config.defaultSettings;
+    this.settings = deepCopy(config.defaultSettings);
   }
 
   get host() {
     return this.players.find(({ host }) => host) as (typeof Room.prototype.players)[0];
+  }
+
+  settingsListener(key: string, newValue: any) {
+    const keys = key.split(".");
+    const lastKey = keys.pop()!;
+    let obj: any = this.settings;
+    for (const key of keys) {
+      obj = obj[key];
+    }
+    obj[lastKey] = newValue;
+    this.verifySettings();
+    this.emitSettings();
+  }
+
+  verifyRangeOrValue<T extends { [key: string]: RangeOrValue }>(
+    object: T,
+    key: keyof T,
+    defaultValue: { min: number; max: number }
+  ) {
+    defaultValue = deepCopy(defaultValue);
+    if (!(key in object)) {
+      object[key] = defaultValue as T[keyof T];
+      return true;
+    }
+    const value = object[key];
+    if (typeof value === "number") return false;
+    if (typeof value !== "object") {
+      object[key] = defaultValue as T[keyof T];
+      return true;
+    }
+    if (typeof value.min !== "number") {
+      object[key] = { min: defaultValue.min, max: value.max } as T[keyof T];
+    }
+    if (typeof value.max !== "number") {
+      object[key] = { min: value.min, max: defaultValue.max } as T[keyof T];
+    }
+    if (value.min > value.max) {
+      object[key] = { min: value.min, max: value.min } as T[keyof T];
+    }
+  }
+
+  verifySettings() {
+    if (!["clicks", "time".includes(this.settings.mode)]) {
+      this.settings.mode = "clicks";
+    }
+    if (this.settings.target < 1) {
+      this.settings.target = 1;
+    }
+    if (this.settings.boosts) {
+      if (
+        typeof this.settings.boosts !== "object" ||
+        this.settings.boosts instanceof Array
+      ) {
+        this.settings.boosts = deepCopy(config.defaultSettings.boosts);
+      } else {
+        ["points", "cooldown", "radius", "edges"].forEach((key) => {
+          this.verifyRangeOrValue(
+            this.settings.boosts as any,
+            key as any,
+            deepCopy(config.defaultSettings.boosts[key as any])
+          );
+        });
+      }
+    } else {
+      this.settings.boosts = false;
+    }
+  }
+
+  emitSettings() {
+    this.io.to(this.id).emit("room.settings", this.settings);
   }
 
   emitPlayers() {
@@ -97,7 +169,6 @@ export class Room {
 
     socket.emit("room.join", { id: this.id });
     socket.join(this.id);
-    this.emitPlayers();
     if (host) {
       socket.emit("room.host");
     }
@@ -114,6 +185,28 @@ export class Room {
         height,
       };
     });
+
+    socket.on("room.chat", (message: string) => {
+      this.io.to(this.id).emit("room.chat", { message, name: name });
+    });
+
+    this.io
+      .to(this.id)
+      .emit("room.chat", { message: `${name} joined the room`, name: "System" });
+
+    socket.on("room.settings", ({ key, value }: { key: string; value: any }) => {
+      if (this.host.socket.id !== socket.id)
+        return socket.emit("err", "Only the host can change settings");
+      try {
+        this.settingsListener(key, value);
+      } catch (e) {
+        socket.emit("err", "Invalid config");
+        console.error(e);
+      }
+    });
+
+    this.emitPlayers();
+    this.emitSettings();
   }
 
   removePlayer({ socketID }: { socketID: string }) {
@@ -146,11 +239,12 @@ export class Room {
       let boost: Boost | null = null;
 
       const generateBoost = async () => {
-        if (!this.settings.boosts) return;
+        if (!this.settings.boosts || gameOver) return;
         await new Promise((resolve) =>
           // @ts-ignore
           setTimeout(resolve, getValue(this.settings.boosts.cooldown))
         );
+        if (gameOver) return;
         boost = {
           points: getValue(this.settings.boosts.points),
           x: Math.random(),

@@ -2,9 +2,38 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + TS</title>
+
+    <!-- Basic seo -->
+    <meta name="author" content="haelp" />
+    <meta name="description" content="A fast-paced online multiplayer clicking game!" />
+
+    <meta property="og:title" content="Cliky" />
+    <meta
+      property="og:description"
+      content="A fast-paced online multiplayer clicking game!"
+    />
+    <meta property="og:image" content="https://cliky.haelp.dev/icon.png" />
+    <meta property="og:url" content="https://cliky.haelp.dev" />
+
+    <!-- twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:domain" value="cliky.haelp.dev" />
+    <meta
+      property="twitter:description"
+      content="A fast-paced online multiplayer clicking game!"
+    />
+    <meta property="twitter:image" content="https://cliky.haelp.dev/icon.png" />
+    <meta name="twitter:url" value="https://cliky.haelp.dev" />
+    <meta name="googlebot" content="notranslate" />
+
+    <!-- Choices CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"
+    />
+
+    <title>Cliky - online multiplayer CPS</title>
     <script src="https://cdn.tailwindcss.com/"></script>
     <style>
       @keyframes endScreen {
@@ -71,6 +100,23 @@
             right top 15px;
         }
       }
+
+      /* For WebKit (Chrome, Safari) */
+      #chat::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* For Firefox */
+      #chat {
+        scrollbar-width: none;
+      }
+
+      .choices__inner {
+        border: 2px solid black;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        background-color: white;
+      }
     </style>
   </head>
   <body>
@@ -129,47 +175,173 @@
         Launch
       </button>
     </div>
-    <div
-      id="screen-lobby"
-      class="flex items-center justify-center h-screen flex-col gap-20"
-      style="display: none"
-    >
-      <div class="text-4xl text-center">
-        Room code:
-        <div
-          id="roomID"
-          class="select-none hover:scale-110 transition-all cursor-pointer"
-        ></div>
+    <div id="screen-lobby" class="flex h-screen gap-5 py-10 px-3" style="display: none">
+      <div class="flex flex-col gap-5">
+        <div class="text-2xl flex gap-3 items-end text-center justify-center">
+          <div id="player-count" class="text-4xl"></div>
+          Players
+        </div>
+        <div id="players" class="flex flex-col w-64 flex-wrap gap-3"></div>
       </div>
-      <div class="flex items-center justify-center gap-10">
-        <div class="flex items-center justify-center gap-5">
-          <div class="flex items-center justify-center gap-5">
-            <div class="flex items-center gap-5">
-              <div class="flex flex-col items-center justify-center gap-5">
-                <div class="text-2xl flex gap-3 items-end">
-                  <div id="player-count" class="text-4xl"></div>
-                  Players
-                </div>
-                <div id="players" class="flex w-96 flex-wrap gap-3"></div>
+      <div class="flex flex-col gap-5 flex-grow items-center">
+        <div
+          class="relative text-4xl text-center flex gap-2 after:content-[''] after:w-[120%] after:bg-black after:h-1 after:absolute after:-bottom-2 after:left-1/2 after:-translate-x-1/2"
+        >
+          Room code:
+          <div
+            id="roomID"
+            class="select-none hover:scale-110 transition-all cursor-pointer flex items-center"
+          ></div>
+        </div>
+        <div class="flex flex-col flex-grow items-stretch px-2 w-full mt-4">
+          <div class="text-3xl mb-3">Room Config</div>
+          <label for="settings-mode" class="text-xl mb-1">Gamemode:</label>
+          <select id="settings-mode" class="fancy-select setting">
+            <option value="clicks" selected>Clicks</option>
+            <option value="time" disabled>Time (comming soon!)</option>
+          </select>
+
+          <label for="settings-target" class="text-xl mb-1">Target:</label>
+          <input
+            type="number"
+            id="settings-target"
+            class="setting border-2 border-black p-2 rounded-md"
+            value="100"
+            min="1"
+          />
+
+          <!-- boosts toggle -->
+
+          <label class="text-xl mb-1 mt-4">Boosts:</label>
+          <label class="relative w-[48px] h-[20px] cursor-pointer">
+            <input id="settings-boosts" type="checkbox" class="w-0 h-0 opacity-0 peer" />
+            <div
+              class="absolute top-0 left-0 right-0 bottom-0 bg-white rounded-full transition-all duration-[400ms] border-2 border-black before:absolute before:content-[''] before:h-[18px] before:w-[18px] before:left-[-2px] before:bottom-[-4px] before:border-4 before:border-black before:rounded-full before:duration-[400ms] before:z-10 before:bg-white peer-checked:before:translate-x-[24px] before:box-content"
+            ></div>
+            <div
+              class="flex w-full gap-[10px] justify-center absolute top-1/2 -translate-y-1/2 text-[10px]"
+            >
+              <span class="check">✔️</span>
+
+              <span class="cross">❌</span>
+            </div>
+          </label>
+
+          <div id="settings-boosts-container" class="flex flex-col my-2 gap-3">
+            <!-- Boost points (min/max) -->
+            <div class="flex items-stretch gap-2">
+              <span class="mt-auto">Boost points:</span>
+              <label for="settings-boosts-points-min">
+                <input
+                  type="number"
+                  id="settings-boosts-points-min"
+                  class="setting border-2 border-black px-2 rounded-md w-20"
+                  value="0"
+                  min="0"
+                />
+              </label>
+              <div class="flex items-center justify-center">
+                <div class="h-1 w-4 bg-black"></div>
               </div>
-              <div class="h-72 w-1 bg-black"></div>
-              <div class="flex flex-col items-center justify-center gap-5">
-                <button
-                  class="border-2 border-black p-2 rounded-md"
-                  id="button-start"
-                  style="display: none"
-                >
-                  Start game
-                </button>
-                <button
-                  class="border-2 border-black p-2 rounded-md hover:bg-slate-100 transition-colors"
-                  id="button-leave"
-                >
-                  Leave room
-                </button>
+              <label for="settings-boosts-points-max">
+                <input
+                  type="number"
+                  id="settings-boosts-points-max"
+                  class="setting border-2 border-black px-2 rounded-md w-20"
+                  value="0"
+                  min="0"
+                />
+              </label>
+            </div>
+
+            <!-- Boost cooldown in milliseconds (min/max) -->
+            <div class="flex items-stretch gap-2">
+              <span class="mt-auto">Boost cooldown (in milliseconds):</span>
+              <label for="settings-boosts-cooldown-min">
+                <input
+                  type="number"
+                  id="settings-boosts-cooldown-min"
+                  class="setting border-2 border-black px-2 rounded-md w-20"
+                  value="0"
+                  min="0"
+                />
+              </label>
+              <div class="flex items-center justify-center">
+                <div class="h-1 w-4 bg-black"></div>
               </div>
+              <label for="settings-boosts-cooldown-max">
+                <input
+                  type="number"
+                  id="settings-boosts-cooldown-max"
+                  class="setting border-2 border-black px-2 rounded-md w-20"
+                  value="0"
+                  min="0"
+                />
+              </label>
+            </div>
+
+            <!-- Boost radius (min/max) -->
+
+            <div class="flex items-stretch gap-2">
+              <span class="mt-auto">Boost radius:</span>
+              <label for="settings-boosts-radius-min">
+                <input
+                  type="number"
+                  id="settings-boosts-radius-min"
+                  class="setting border-2 border-black px-2 rounded-md w-20"
+                  value="0"
+                  min="0"
+                />
+              </label>
+              <div class="flex items-center justify-center">
+                <div class="h-1 w-4 bg-black"></div>
+              </div>
+              <label for="settings-boosts-radius-max">
+                <input
+                  type="number"
+                  id="settings-boosts-radius-max"
+                  class="setting border-2 border-black px-2 rounded-md w-20"
+                  value="0"
+                  min="0"
+                />
+              </label>
             </div>
           </div>
+        </div>
+        <div class="flex items-center justify-center gap-5">
+          <button
+            class="border-2 border-black p-2 rounded-md"
+            id="button-start"
+            style="display: none"
+          >
+            Start game
+          </button>
+          <button
+            class="border-2 border-black p-2 rounded-md hover:bg-slate-100 transition-colors"
+            id="button-leave"
+          >
+            Leave room
+          </button>
+        </div>
+      </div>
+      <div class="flex flex-col w-64">
+        <div
+          class="flex flex-col flex-grow gap-1 border-2 border-black p-2 rounded-t-md border-b-0 overflow-auto"
+          id="chat"
+        ></div>
+        <div class="flex gap-5 border-2 border-black px-2 rounded-b-md">
+          <input
+            class="outline-none"
+            placeholder="Enter a message to chat"
+            id="input-chat"
+          />
+          <button class="" id="button-chat">
+            <img
+              src="/send.png"
+              alt="Send"
+              class="scale-[.8] hover:scale-[.9] transition-all"
+            />
+          </button>
         </div>
       </div>
     </div>
@@ -203,7 +375,7 @@
       </div>
     </div>
     <div id="endScreen" class="hidden"></div>
-    <div class="fixed z-50 bottom-3 left-3 font-mono text-sm">
+    <div class="fixed z-50 bottom-3 left-3 font-mono text-sm pointer-events-none">
       <div>cliky v<span id="version"></span></div>
       <span id="ping"></span> ms ping | <span id="fps"></span> fps
     </div>
